@@ -583,6 +583,11 @@ void *SDL_ShaderCross_CompileDXILFromHLSL(
 #if SDL_PLATFORM_GDK
     return SDL_ShaderCross_INTERNAL_CompileUsingDXC(info, false, size);
 #else
+
+    if (SDL_GetBooleanProperty(info->props, SDL_SHADERCROSS_PROP_HLSL_SKIP_SPIRV_ROUNDTRIP_BOOLEAN, false)) {
+        return SDL_ShaderCross_INTERNAL_CompileUsingDXC(info, false, size);
+    }
+
     // Roundtrip to SPIR-V to support things like Structured Buffers.
     size_t spirvSize;
     void *spirv = SDL_ShaderCross_CompileSPIRVFromHLSL(
@@ -652,6 +657,15 @@ typedef void ID3DInclude;      /* hack, unused */
 #define D3DCOMPILER_DLL "libvkd3d-utils.1.dylib"
 #else
 #define D3DCOMPILER_DLL "libvkd3d-utils.so.1"
+#endif
+
+#ifdef SDL_ELF_NOTE_DLOPEN
+SDL_ELF_NOTE_DLOPEN(
+    "dxbc",
+    "Create DXBC shaders from HLSL",
+    SDL_ELF_NOTE_DLOPEN_PRIORITY_SUGGESTED,
+    D3DCOMPILER_DLL
+)
 #endif
 
 /* __stdcall declaration, largely taken from vkd3d_windows.h */
@@ -831,7 +845,7 @@ void *SDL_ShaderCross_CompileDXBCFromHLSL(
 
     return SDL_ShaderCross_INTERNAL_CompileDXBCFromHLSL(
         info,
-        true,
+        !SDL_GetBooleanProperty(info->props, SDL_SHADERCROSS_PROP_HLSL_SKIP_SPIRV_ROUNDTRIP_BOOLEAN, false),
         size);
 }
 
@@ -2429,9 +2443,10 @@ void *SDL_ShaderCross_CompileDXILFromSPIRV(
     hlslInfo.shader_stage = info->shader_stage;
     hlslInfo.props = info->props;
 
-    void *result = SDL_ShaderCross_CompileDXILFromHLSL(
-        &hlslInfo,
-        size);
+    void *result = SDL_ShaderCross_INTERNAL_CompileUsingDXC(
+      &hlslInfo,
+      false,
+      size);
 
     SDL_ShaderCross_INTERNAL_DestroyTranspileContext(context);
     return result;
